@@ -1,5 +1,6 @@
 import { Dispatch, SetStateAction, useCallback, useState } from 'react';
 import { isBrowser, noop } from './misc/util';
+import useLatest from './useLatest';
 
 type parserOptions<T> =
   | {
@@ -16,9 +17,6 @@ const useLocalStorage = <T>(
   initialValue?: T,
   options?: parserOptions<T>
 ): [T | undefined, Dispatch<SetStateAction<T | undefined>>, () => void] => {
-  if (!isBrowser) {
-    return [initialValue as T, noop, noop];
-  }
   if (!key) {
     throw new Error('useLocalStorage key may not be falsy');
   }
@@ -29,7 +27,6 @@ const useLocalStorage = <T>(
       : options.deserializer
     : JSON.parse;
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [state, setState] = useState<T | undefined>(() => {
     try {
       const serializer = options ? (options.raw ? String : options.serializer) : JSON.stringify;
@@ -49,12 +46,15 @@ const useLocalStorage = <T>(
     }
   });
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const latestStateRef = useLatest(state);
+
   const set: Dispatch<SetStateAction<T | undefined>> = useCallback(
     (valOrFunc) => {
       try {
         const newState =
-          typeof valOrFunc === 'function' ? (valOrFunc as Function)(state) : valOrFunc;
+          typeof valOrFunc === 'function'
+            ? (valOrFunc as Function)(latestStateRef.current)
+            : valOrFunc;
         if (typeof newState === 'undefined') return;
         let value: string;
 
@@ -73,10 +73,9 @@ const useLocalStorage = <T>(
         // localStorage can throw. Also JSON.stringify can throw.
       }
     },
-    [key, setState]
+    [key]
   );
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const remove = useCallback(() => {
     try {
       localStorage.removeItem(key);
@@ -85,9 +84,11 @@ const useLocalStorage = <T>(
       // If user is in private mode or has storage restriction
       // localStorage can throw.
     }
-  }, [key, setState]);
+  }, [key]);
 
   return [state, set, remove];
 };
 
-export default useLocalStorage;
+export default isBrowser
+  ? useLocalStorage
+  : (((_key: string, initialValue?: any) => [initialValue, noop, noop]) as typeof useLocalStorage);

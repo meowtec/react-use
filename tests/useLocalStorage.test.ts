@@ -142,16 +142,17 @@ describe(useLocalStorage, () => {
 
   it('sets localStorage from the function updater', () => {
     const { result, rerender } = renderHook(() =>
-      useLocalStorage<{ foo: string; fizz?: string }>('foo', { foo: 'bar' })
+      useLocalStorage<{ foo: string; count: number }>('foo', { foo: 'bar', count: 0 })
     );
 
     const [, setFoo] = result.current;
-    act(() => setFoo((state) => ({ ...state!, fizz: 'buzz' })));
+    act(() => setFoo((state) => ({ ...state!, count: state!.count + 1 })));
+    act(() => setFoo((state) => ({ ...state!, count: state!.count + 1 })));
     rerender();
 
     const [value] = result.current;
     expect(value!.foo).toEqual('bar');
-    expect(value!.fizz).toEqual('buzz');
+    expect(value!.count).toEqual(2);
   });
 
   it('rejects nullish or undefined keys', () => {
